@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Primitive Definitions
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isAdmin() { 
+      return isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        request.auth.token.email == 'tahyas68@gmail.com'
+      ); 
+    }
+    function isInstructor() { 
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'instructor'; 
+    }
+
+    // --- Entitiy Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role']) &&
+             data.keys().size() <= 10 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email == request.auth.token.email &&
+             data.role in ['student', 'instructor', 'admin'];
+    }
+
+    function isValidCourse(data) {
+      return data.keys().hasAll(['title', 'description']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.description is string && data.description.size() < 2000;
+    }
+
+    function isValidSection(data) {
+      return data.keys().hasAll(['title', 'orderIndex']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.orderIndex is number;
+    }
+
+    function isValidLesson(data) {
+      return data.keys().hasAll(['title', 'videoUrl', 'orderIndex']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.videoUrl is string && data.videoUrl.size() < 500 &&
+             data.orderIndex is number;
+    }
+
+    // --- Match Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && request.query.limit <= 1);
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId && 
+                       isValidUser(incoming()) && 
+                       incoming().role == existing().role; // Users can't change their own role
+      allow update: if isAdmin();
+    }
+
+    match /users/{userId}/progress/{lessonId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create: if (isAdmin() || isInstructor()) && isValidCourse(incoming());
+      allow update: if (isAdmin() || isInstructor()) && isValidCourse(incoming());
+      allow delete: if isAdmin();
+
+      match /sections/{sectionId} {
+        allow read: if true;
+        allow write: if isAdmin() || isInstructor();
+
+        match /lessons/{lessonId} {
+          allow read: if true;
+          allow write: if isAdmin() || isInstructor();
+        }
+      }
+    }
+
+    match /accessCodes/{code} {
+      allow get: if isSignedIn();
+      allow create: if isAdmin() && isValidId(code);
+      allow update: if isSignedIn() && (
+        incoming().redeemedBy == request.auth.uid && 
+        existing().redeemedBy == null
+      ) || isAdmin();
+      allow list: if isAdmin() || (isSignedIn() && resource.data.redeemedBy == request.auth.uid);
+    }
+  }
+}

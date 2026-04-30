@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["student", "instructor", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational course metadata",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "instructorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description"]
+    },
+    "Section": {
+      "title": "Course Section",
+      "description": "Organizational section within a course",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "orderIndex": { "type": "number" }
+      },
+      "required": ["title", "orderIndex"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Individual lecture or video",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "orderIndex": { "type": "number" }
+      },
+      "required": ["title", "videoUrl", "orderIndex"]
+    },
+    "AccessCode": {
+      "title": "Access Code",
+      "description": "Code used to unlock a course",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "courseId": { "type": "string" },
+        "assignedTo": { "type": "string", "description": "Email restricted to" },
+        "redeemedBy": { "type": "string", "description": "User UID who redeemed" },
+        "redeemedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "courseId"]
+    },
+    "Progress": {
+      "title": "User Progress",
+      "description": "Tracking completion of lessons",
+      "type": "object",
+      "properties": {
+        "lessonId": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["lessonId", "completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/progress/{moduleId}": {
+      "schema": "Progress",
+      "description": "User lesson progress"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Catalogue of courses"
+    },
+    "/courses/{courseId}/sections/{sectionId}": {
+      "schema": "Section",
+      "description": "Course structure sections"
+    },
+    "/courses/{courseId}/sections/{sectionId}/lessons/{lessonId}": {
+      "schema": "Lesson",
+      "description": "Actual lesson content"
+    },
+    "/accessCodes/{code}": {
+      "schema": "AccessCode",
+      "description": "Enrollment codes"
+    }
+  }
+}
